@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>漢字聼音砌字大冒險</title>
+    <script src="passage1.js"></script>
+    <script src="passage2.js"></script>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+            background-color: #f0f7f4;
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .game-container {
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            padding: 30px;
+            max-width: 650px;
+            width: 100%;
+            border: 4px solid #b4e197;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            color: #5c8374;
+            font-size: 26px;
+            margin-bottom: 15px;
+        }
+
+        .level-selector {
+            background: #f9fbf9;
+            border: 2px solid #b4e197;
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #5c8374;
+        }
+
+        .level-selector select {
+            font-size: 16px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid #b4e197;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            font-size: 17px;
+            font-weight: bold;
+            margin: 15px 0;
+            color: #5c8374;
+            background: #f9fbf9;
+            padding: 12px;
+            border-radius: 14px;
+            border: 2px dashed #d8e2dc;
+        }
+
+        #target-slots {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            min-height: 75px;
+            margin: 20px 0;
+            background: #fffdf9;
+            border: 3px dashed #d8e2dc;
+            border-radius: 16px;
+            padding: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .slot-box {
+            width: 52px;
+            height: 52px;
+            background-color: #f0f7f4;
+            border: 2px solid #b4e197;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: #5c8374;
+        }
+
+        .slot-box.filled {
+            background-color: #b5ead7;
+            border-color: #90cdbc;
+        }
+
+        #grid-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 20px auto;
+            justify-content: center;
+        }
+
+        .grid-tile {
+            background-color: #ffb7b2;
+            color: white;
+            font-size: 30px;
+            font-weight: bold;
+            height: 65px;
+            width: 65px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px #ff9aa2;
+            user-select: none;
+            transition: all 0.3s ease;
+        }
+
+        .grid-tile:active {
+            transform: translateY(2px);
+        }
+
+        .grid-tile.used {
+            background-color: #e0e0e0 !important;
+            box-shadow: 0 4px #ccc !important;
+            color: #999;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .grid-tile.glow {
+            animation: pulseGlow 0.8s infinite alternate;
+            border: 4px solid #ffeb3b;
+        }
+
+        @keyframes pulseGlow {
+            from { box-shadow: 0 0 8px #ffeb3b, 0 0 15px #ffeb3b; transform: scale(1.05); }
+            to { box-shadow: 0 0 20px #ff9800, 0 0 35px #ff9800; transform: scale(1.12); }
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        button {
+            background-color: #ffb7b2;
+            border: none;
+            color: white;
+            padding: 10px 22px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px #ff9aa2;
+        }
+
+        button:active {
+            transform: translateY(2px);
+        }
+
+        button.secondary {
+            background-color: #b5ead7;
+            color: #333;
+            box-shadow: 0 4px #c7ceea;
+        }
+
+        button.hint-btn {
+            background-color: #ffeaa7;
+            color: #d63031;
+            box-shadow: 0 4px #fdcb6e;
+        }
+
+        #feedback {
+            font-size: 19px;
+            font-weight: bold;
+            height: 35px;
+            margin-top: 10px;
+            color: #ff9aa2;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <h1>🎧 漢字聼音砌字大冒險</h1>
+
+        <div class="level-selector">
+            🎯 選擇關卡：
+            <select id="level-select" onchange="manualSelectLevel()">
+                <option value="1">Level 1</option>
+                <option value="2">Level 2</option>
+            </select>
+        </div>
+
+        <div class="stats-bar">
+            <div>🟢 正確: <span id="stat-correct">0</span></div>
+            <div>🔴 錯誤: <span id="stat-wrong">0</span></div>
+            <div>🪙 金幣: <span id="stat-coins">0</span></div>
+        </div>
+
+        <div id="feedback">載入中...</div>
+
+        <!-- Sentence assembly slots -->
+        <div id="target-slots"></div>
+
+        <!-- Scrambled word grid -->
+        <div id="grid-container"></div>
+
+        <div class="btn-group">
+            <button class="secondary" onclick="repeatSentence()">🔊 再聼一次</button>
+            <button class="hint-btn" onclick="requestHint()">💡 提示</button>
+            <button onclick="resetCurrentSentence()">🔄 重設此句</button>
+        </div>
+    </div>
+
+    <script>
+        let currentPassages = [];
+        let currentLevel = 1;
+        let currentSentenceIndex = 0;
+        let targetChars = [];
+        let shuffledChars = [];
+        let playerProgressIndex = 0;
+        let gameActive = false;
+        let userManuallySelected = false;
+
+        // Score tracking variables
+        let organicCorrectCount = 0; 
+        let hintUsedForThisWord = false; 
+        let totalWordsAttempted = 0;
+        let wrongCount = 0;
+        let coins = 0;
+
+        window.onload = function() {
+            loadLevel(1, false);
+        };
+
+        function manualSelectLevel() {
+            const selected = document.getElementById('level-select').value;
+            userManuallySelected = true;
+            loadLevel(parseInt(selected), true);
+        }
+
+        function loadLevel(lvl, isManual) {
+            currentLevel = lvl;
+            document.getElementById('level-select').value = lvl;
+            
+            if (lvl === 1 && typeof passagesLevel1 !== 'undefined') {
+                currentPassages = passagesLevel1;
+            } else if (lvl === 2 && typeof passagesLevel2 !== 'undefined') {
+                currentPassages = passagesLevel2;
+            } else {
+                currentPassages = ["載入失敗"];
+            }
+
+            organicCorrectCount = 0;
+            totalWordsAttempted = 0;
+            wrongCount = 0;
+            updateScoreboard();
+
+            initGame();
+        }
+
+        function initGame() {
+            currentSentenceIndex = 0;
+            loadSentence();
+        }
+
+        function loadSentence() {
+            if (currentSentenceIndex >= currentPassages.length) {
+                gameActive = false;
+                
+                let accuracy = totalWordsAttempted > 0 ? (organicCorrectCount / totalWordsAttempted) : 0;
+                let rewardMsg = "";
+
+                if (accuracy >= 0.90 && totalWordsAttempted > 0) {
+                    coins += 5;
+                    rewardMsg = " 🌟 準確率超過 90%，獲得 5 枚金幣！🪙";
+                }
+
+                document.getElementById('feedback').innerText = `🏆 Level ${currentLevel} 通關！` + rewardMsg;
+                speak(`太棒了！通關！`);
+                document.getElementById('target-slots').innerHTML = '';
+                document.getElementById('grid-container').innerHTML = '';
+                updateScoreboard();
+
+                if (!userManuallySelected) {
+                    setTimeout(() => {
+                        let nextLevel = currentLevel + 1;
+                        const selectElem = document.getElementById('level-select');
+                        if (nextLevel <= selectElem.options.length) {
+                            loadLevel(nextLevel, false);
+                        }
+                    }, 3500);
+                }
+                return;
+            }
+
+            gameActive = true;
+            playerProgressIndex = 0;
+            hintUsedForThisWord = false;
+
+            const sentenceStr = currentPassages[currentSentenceIndex];
+            targetChars = sentenceStr.split('');
+            shuffledChars = [...targetChars].sort(() => Math.random() - 0.5);
+
+            buildSlots();
+            buildGrid();
+            playCurrentSentence();
+        }
+
+        function buildSlots() {
+            const container = document.getElementById('target-slots');
+            container.innerHTML = '';
+            targetChars.forEach((_, i) => {
+                const slot = document.createElement('div');
+                slot.className = 'slot-box';
+                slot.id = `slot-${i}`;
+                container.appendChild(slot);
+            });
+        }
+
+        function buildGrid() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+
+            shuffledChars.forEach((char, index) => {
+                const tile = document.createElement('div');
+                tile.className = 'grid-tile';
+                tile.innerText = char;
+                tile.id = `tile-${index}`;
+                tile.onclick = () => handleTileClick(char, tile);
+                container.appendChild(tile);
+            });
+        }
+
+        function playCurrentSentence() {
+            if (!gameActive) return;
+            const sentenceStr = currentPassages[currentSentenceIndex];
+            document.getElementById('feedback').innerText = '請聼句子，按順序選出正確的字！';
+            speak(sentenceStr);
+        }
+
+        function repeatSentence() {
+            if (!gameActive) return;
+            speak(currentPassages[currentSentenceIndex]);
+        }
+
+        function resetCurrentSentence() {
+            if (!gameActive) return;
+            playerProgressIndex = 0;
+            hintUsedForThisWord = false;
+            buildSlots();
+            document.querySelectorAll('.grid-tile').forEach(t => {
+                t.classList.remove('used', 'glow');
+            });
+            document.getElementById('feedback').innerText = '已重設，請重新選字！';
+        }
+
+        function requestHint() {
+            if (!gameActive) return;
+            hintUsedForThisWord = true; 
+            const expectedChar = targetChars[playerProgressIndex];
+
+            document.querySelectorAll('.grid-tile').forEach(tile => {
+                if (tile.innerText === expectedChar && !tile.classList.contains('used')) {
+                    tile.classList.add('glow');
+                }
+            });
+            document.getElementById('feedback').innerText = '💡 提示：發光的字就是下一個正確的字！';
+        }
+
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-HK';
+                utterance.rate = 0.8;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function updateScoreboard() {
+            document.getElementById('stat-correct').innerText = organicCorrectCount;
+            document.getElementById('stat-wrong').innerText = wrongCount;
+            document.getElementById('stat-coins').innerText = coins;
+        }
+
+        function handleTileClick(selectedChar, tileElement) {
+            if (!gameActive || tileElement.classList.contains('used')) return;
+
+            const expectedChar = targetChars[playerProgressIndex];
+            totalWordsAttempted++;
+
+            if (selectedChar === expectedChar) {
+                document.querySelectorAll('.grid-tile').forEach(t => t.classList.remove('glow'));
+
+                const slot = document.getElementById(`slot-${playerProgressIndex}`);
+                slot.innerText = selectedChar;
+                slot.classList.add('filled');
+                tileElement.classList.add('used');
+
+                if (!hintUsedForThisWord) {
+                    organicCorrectCount++;
+                } else {
+                    wrongCount++; 
+                }
+
+                updateScoreboard();
+                playerProgressIndex++;
+                hintUsedForThisWord = false; 
+                document.getElementById('feedback').innerText = '👍 對啦！繼續選下一個字！';
+
+                if (playerProgressIndex >= targetChars.length) {
+                    document.getElementById('feedback').innerText = '🎉 太棒了！這句完成！';
+                    currentSentenceIndex++;
+                    setTimeout(loadSentence, 1200);
+                }
+            } else {
+                wrongCount++;
+                updateScoreboard();
+                document.getElementById('feedback').innerText = '❌ 順序不對哦，點擊「提示」按鈕看看！';
+                
+                document.querySelectorAll('.grid-tile').forEach(tile => {
+                    if (tile.innerText === expectedChar && !tile.classList.contains('used')) {
+                        tile.classList.add('glow');
+                    }
+                });
+
+                setTimeout(repeatSentence, 800);
+            }
+        }
+    </script>
+</body>
+</html>
