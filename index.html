@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>漢字聼音砌字大冒險</title>
+    <!-- Matter.js Physics Engine CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script src="passage1.js"></script>
     <script src="passage2.js"></script>
     <style>
@@ -21,37 +23,63 @@
             min-height: 100vh;
         }
 
+        .main-layout {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 20px;
+            max-width: 960px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
         .game-container {
             background: #ffffff;
             border-radius: 24px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.1);
             padding: 30px;
-            max-width: 650px;
+            max-width: 680px;
             width: 100%;
             border: 4px solid #b4e197;
             box-sizing: border-box;
+            position: relative;
+        }
+
+        .jar-sidebar {
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+            padding: 20px 15px;
+            width: 280px;
+            border: 4px solid #ffcc80;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
         }
 
         h1 {
             color: #5c8374;
             font-size: 26px;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
 
-        .level-selector {
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             background: #f9fbf9;
             border: 2px solid #b4e197;
             border-radius: 12px;
-            padding: 10px;
+            padding: 8px 15px;
             margin-bottom: 15px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #5c8374;
         }
 
         .level-selector select {
-            font-size: 16px;
-            padding: 6px 12px;
+            font-size: 15px;
+            padding: 5px 10px;
             border-radius: 8px;
             border: 1px solid #b4e197;
             background: #fff;
@@ -59,17 +87,100 @@
             cursor: pointer;
         }
 
+        .parent-btn {
+            background-color: #a0c4ff;
+            color: #333;
+            padding: 6px 14px;
+            font-size: 14px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 3px #70a9ff;
+        }
+
         .stats-bar {
             display: flex;
             justify-content: space-around;
-            font-size: 17px;
+            font-size: 16px;
             font-weight: bold;
             margin: 15px 0;
             color: #5c8374;
             background: #f9fbf9;
-            padding: 12px;
+            padding: 10px;
             border-radius: 14px;
             border: 2px dashed #d8e2dc;
+        }
+
+        .basket-header {
+            font-size: 14px;
+            font-weight: bold;
+            color: #e65100;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .clear-candies-btn {
+            background-color: #ff7675;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            box-shadow: 0 2px #d63031;
+        }
+
+        .clear-candies-btn:active {
+            transform: translateY(1px);
+        }
+
+        .container-wrapper {
+            position: relative;
+            width: 220px;
+            height: 380px;
+            margin: 0 auto;
+            border-radius: 16px;
+            overflow: hidden;
+            background-color: #fffdf9;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+            border: 3px solid #ffb7b2;
+        }
+
+        #candy-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #sentence-display {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 15px 0;
+            font-size: 32px;
+            font-weight: bold;
+            min-height: 50px;
+            align-items: center;
+        }
+
+        .highlight-word {
+            padding: 2px 8px;
+            border-radius: 8px;
+            background-color: transparent;
+            color: #5c8374;
+            display: inline-block;
+        }
+
+        .highlight-word.active {
+            background-color: #ffeb3b;
+            color: #d63031;
+            box-shadow: 0 0 10px rgba(255, 235, 59, 0.8);
         }
 
         #target-slots {
@@ -77,7 +188,7 @@
             gap: 10px;
             justify-content: center;
             min-height: 75px;
-            margin: 20px 0;
+            margin: 15px 0;
             background: #fffdf9;
             border: 3px dashed #d8e2dc;
             border-radius: 16px;
@@ -105,6 +216,11 @@
             border-color: #90cdbc;
         }
 
+        .slot-box.drag-over {
+            background-color: #ffeaa7;
+            border-color: #fdcb6e;
+        }
+
         #grid-container {
             display: flex;
             flex-wrap: wrap;
@@ -124,14 +240,15 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
+            cursor: grab;
             box-shadow: 0 4px #ff9aa2;
             user-select: none;
-            transition: all 0.3s ease;
+            touch-action: none;
+            transition: transform 0.2s ease;
         }
 
         .grid-tile:active {
-            transform: translateY(2px);
+            cursor: grabbing;
         }
 
         .grid-tile.used {
@@ -140,6 +257,7 @@
             color: #999;
             cursor: not-allowed;
             pointer-events: none;
+            opacity: 0.5;
         }
 
         .grid-tile.glow {
@@ -148,8 +266,8 @@
         }
 
         @keyframes pulseGlow {
-            from { box-shadow: 0 0 8px #ffeb3b, 0 0 15px #ffeb3b; transform: scale(1.05); }
-            to { box-shadow: 0 0 20px #ff9800, 0 0 35px #ff9800; transform: scale(1.12); }
+            from { box-shadow: 0 0 8px #ffeb3b, 0 0 15px #ffeb3b; }
+            to { box-shadow: 0 0 20px #ff9800, 0 0 35px #ff9800; }
         }
 
         .btn-group {
@@ -194,43 +312,216 @@
             margin-top: 10px;
             color: #ff9aa2;
         }
+
+        #parent-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #fff;
+            padding: 25px;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            border: 4px solid #5c8374;
+            text-align: left;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-content h2 { color: #5c8374; margin-top: 0; }
+        .log-entry {
+            background: #f9fbf9;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #d8e2dc;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
 
-    <div class="game-container">
-        <h1>🎧 漢字聼音砌字大冒險</h1>
+    <div class="main-layout">
+        <div class="game-container">
+            <h1>🎧 漢字聼音砌字大冒險</h1>
 
-        <div class="level-selector">
-            🎯 選擇關卡：
-            <select id="level-select" onchange="manualSelectLevel()">
-                <option value="1">Level 1</option>
-                <option value="2">Level 2</option>
-            </select>
+            <div class="top-bar">
+                <div class="level-selector">
+                    🎯 選擇關卡：
+                    <select id="level-select" onchange="manualSelectLevel()">
+                        <option value="1">Level 1</option>
+                        <option value="2">Level 2</option>
+                    </select>
+                </div>
+                <button class="parent-btn" onclick="openParentPortal()">🔒 家長專區</button>
+            </div>
+
+            <div class="stats-bar">
+                <div>🟢 正確: <span id="stat-correct">0</span></div>
+                <div>🔴 錯誤: <span id="stat-wrong">0</span></div>
+                <div>🪙 金幣: <span id="stat-coins">0</span></div>
+                <div>🍬 糖果: <span id="stat-sweets">0</span></div>
+            </div>
+
+            <div id="sentence-display"></div>
+
+            <div id="feedback">載入中...</div>
+
+            <div id="target-slots"></div>
+            <div id="grid-container"></div>
+
+            <div class="btn-group">
+                <button class="secondary" onclick="playSentenceWithHighlight()">🔊 再聼一次示範</button>
+                <button class="hint-btn" onclick="requestHint()">💡 提示</button>
+                <button onclick="resetCurrentSentence()">🔄 重設此句</button>
+            </div>
         </div>
 
-        <div class="stats-bar">
-            <div>🟢 正確: <span id="stat-correct">0</span></div>
-            <div>🔴 錯誤: <span id="stat-wrong">0</span></div>
-            <div>🪙 金幣: <span id="stat-coins">0</span></div>
+        <div class="jar-sidebar">
+            <div class="basket-header">🍬 糖果罐<br>(已完成句子: <span id="stat-sentences">0</span>)</div>
+            <button class="clear-candies-btn" onclick="clearAllCandies()">🗑️ 清空糖果</button>
+            <div class="container-wrapper">
+                <!-- Physics canvas simulation underneath -->
+                <canvas id="candy-canvas" width="140" height="380"></canvas>
+                <!-- Jar background image overlay with pointer-events: none -->
+                <img src="container.png" alt="Jar" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 10; pointer-events: none; mix-blend-mode: multiply;">
+            </div>
         </div>
+    </div>
 
-        <div id="feedback">載入中...</div>
-
-        <!-- Sentence assembly slots -->
-        <div id="target-slots"></div>
-
-        <!-- Scrambled word grid -->
-        <div id="grid-container"></div>
-
-        <div class="btn-group">
-            <button class="secondary" onclick="repeatSentence()">🔊 再聼一次</button>
-            <button class="hint-btn" onclick="requestHint()">💡 提示</button>
-            <button onclick="resetCurrentSentence()">🔄 重設此句</button>
+    <div id="parent-modal">
+        <div class="modal-content">
+            <h2>🔒 家長學習記錄專區</h2>
+            <div id="parent-body">
+                <p>請輸入家長密碼 (預設: 1234)：</p>
+                <input type="password" id="parent-pin" style="padding: 6px; font-size: 16px; width: 120px;" placeholder="PIN">
+                <button onclick="verifyPin()" style="padding: 6px 14px; font-size: 14px;">確認</button>
+                <div id="pin-error" style="color: red; font-size: 13px; margin-top: 5px;"></div>
+            </div>
         </div>
     </div>
 
     <script>
+        // ==========================================
+        // 🎛️ ADJUST YOUR PNG CANDY SCALE HERE
+        // ==========================================
+        const CANDY_CONFIG = {
+            jarWidth: 200,
+            scale: 0.05,         // Adjust candy size here if needed
+            bodyWidth: 30,       
+            bodyHeight: 30,      
+            restitution: 0.9,    
+            friction: 0.8        
+        };
+        // ==========================================
+
+        let physicsEngine, physicsRender, physicsRunner;
+        let candyImages = [];
+
+function initPhysicsJar() {
+            const { Engine, Render, Runner, Bodies, Composite } = Matter;
+
+            physicsEngine = Engine.create();
+            physicsEngine.world.gravity.y = 1;
+
+            const canvas = document.getElementById('candy-canvas');
+            canvas.width = CANDY_CONFIG.jarWidth; // Uses your config width
+            canvas.height = 380;
+
+            physicsRender = Render.create({
+                canvas: canvas,
+                engine: physicsEngine,
+                options: {
+                    width: CANDY_CONFIG.jarWidth, // Uses your config width
+                    height: 380,
+                    wireframes: false,
+                    background: 'transparent'
+                }
+            });
+
+            Render.run(physicsRender);
+            physicsRunner = Runner.create();
+            Runner.run(physicsRunner, physicsEngine);
+
+            // Boundaries automatically adjust based on the width
+            const halfW = CANDY_CONFIG.jarWidth / 2;
+            const ground = Bodies.rectangle(halfW, 390, CANDY_CONFIG.jarWidth, 20, { isStatic: true, render: { visible: false } });
+            const leftWall = Bodies.rectangle(-5, 190, 20, 380, { isStatic: true, render: { visible: false } });
+            const rightWall = Bodies.rectangle(CANDY_CONFIG.jarWidth + 5, 190, 20, 380, { isStatic: true, render: { visible: false } });
+            Composite.add(physicsEngine.world, [ground, leftWall, rightWall]);
+
+            candyImages = [];
+            for (let i = 1; i <= 18; i++) {
+                candyImages.push(`candy${i}.png`);
+            }
+        }
+
+        function clearAllCandies() {
+            if (!physicsEngine) return;
+            const allBodies = Matter.Composite.allBodies(physicsEngine.world);
+            const nonStaticBodies = allBodies.filter(body => !body.isStatic);
+            Matter.Composite.remove(physicsEngine.world, nonStaticBodies);
+
+            totalSweets = 0;
+            saveSweetData();
+            updateScoreboard();
+        }
+
+        function spawnPhysicsCandy() {
+            const { Bodies, Composite } = Matter;
+            if (!physicsEngine) return;
+
+            const randomImg = candyImages[Math.floor(Math.random() * candyImages.length)];
+            const startX = 50 + Math.random() * 40;
+            const startY = -20 - (Math.random() * 20);
+
+            const candy = Bodies.rectangle(startX, startY, CANDY_CONFIG.bodyWidth, CANDY_CONFIG.bodyHeight, {
+                restitution: CANDY_CONFIG.restitution,
+                friction: CANDY_CONFIG.friction,
+                angle: Math.random() * Math.PI,
+                render: {
+                    sprite: {
+                        texture: randomImg,
+                        xScale: CANDY_CONFIG.scale,
+                        yScale: CANDY_CONFIG.scale
+                    }
+                }
+            });
+
+            Composite.add(physicsEngine.world, candy);
+            playCandyClinkSound();
+        }
+
+        function loadInitialPhysicsCandies(count) {
+            if (!physicsEngine) return;
+            for (let i = 0; i < count; i++) {
+                const { Bodies, Composite } = Matter;
+                const randomImg = candyImages[i % candyImages.length];
+                const x = 30 + (i * 20) % 85;
+                const y = 350 - (Math.floor(i / 4) * 18);
+                
+                const candy = Bodies.rectangle(x, y, CANDY_CONFIG.bodyWidth, CANDY_CONFIG.bodyHeight, {
+                    restitution: CANDY_CONFIG.restitution,
+                    friction: CANDY_CONFIG.friction,
+                    angle: Math.random() * Math.PI,
+                    render: {
+                        sprite: {
+                            texture: randomImg,
+                            xScale: CANDY_CONFIG.scale,
+                            yScale: CANDY_CONFIG.scale
+                        }
+                    }
+                });
+                Composite.add(physicsEngine.world, candy);
+            }
+        }
+
+        // --- Game Logic ---
         let currentPassages = [];
         let currentLevel = 1;
         let currentSentenceIndex = 0;
@@ -240,24 +531,81 @@
         let gameActive = false;
         let userManuallySelected = false;
 
-        // Score tracking variables
         let organicCorrectCount = 0; 
         let hintUsedForThisWord = false; 
         let totalWordsAttempted = 0;
         let wrongCount = 0;
         let coins = 0;
+        let completedSentencesCount = 0;
+        let totalSweets = 0;
+        let wrongWordsThisSession = []; 
 
         window.onload = function() {
+            initPhysicsJar();
+            loadSweetData();
             loadLevel(1, false);
         };
 
+        function loadSweetData() {
+            totalSweets = parseInt(localStorage.getItem('kid_total_sweets') || '0');
+            completedSentencesCount = parseInt(localStorage.getItem('kid_completed_sentences') || '0');
+            updateScoreboard();
+            setTimeout(() => {
+                loadInitialPhysicsCandies(totalSweets);
+            }, 300);
+        }
+
+        function saveSweetData() {
+            localStorage.setItem('kid_total_sweets', totalSweets);
+            localStorage.setItem('kid_completed_sentences', completedSentencesCount);
+        }
+
+        function playCandyClinkSound() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800 + Math.random() * 500, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.08);
+                
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.08);
+            } catch(e) {}
+        }
+
         function manualSelectLevel() {
-            const selected = document.getElementById('level-select').value;
+            const selected = parseInt(document.getElementById('level-select').value);
+            if (isLevelCompletedToday(selected)) {
+                alert('🌟 這一關今天已經通關囉！請明天再來挑戰，或者選擇其他關卡。');
+                document.getElementById('level-select').value = currentLevel; 
+                return;
+            }
             userManuallySelected = true;
-            loadLevel(parseInt(selected), true);
+            loadLevel(selected, true);
+        }
+
+        function isLevelCompletedToday(lvl) {
+            const todayStr = new Date().toISOString().split('T')[0]; 
+            const history = JSON.parse(localStorage.getItem('study_completion_history') || '[]');
+            return history.some(record => record.date === todayStr && record.level === lvl);
         }
 
         function loadLevel(lvl, isManual) {
+            if (isLevelCompletedToday(lvl)) {
+                alert(`🌟 Level ${lvl} 今天已經順利通關過囉！`);
+                lvl = 1;
+            }
+
             currentLevel = lvl;
             document.getElementById('level-select').value = lvl;
             
@@ -272,6 +620,7 @@
             organicCorrectCount = 0;
             totalWordsAttempted = 0;
             wrongCount = 0;
+            wrongWordsThisSession = [];
             updateScoreboard();
 
             initGame();
@@ -285,30 +634,21 @@
         function loadSentence() {
             if (currentSentenceIndex >= currentPassages.length) {
                 gameActive = false;
-                
                 let accuracy = totalWordsAttempted > 0 ? (organicCorrectCount / totalWordsAttempted) : 0;
                 let rewardMsg = "";
 
                 if (accuracy >= 0.90 && totalWordsAttempted > 0) {
                     coins += 5;
                     rewardMsg = " 🌟 準確率超過 90%，獲得 5 枚金幣！🪙";
+                    saveCompletionRecord(currentLevel, currentPassages, wrongWordsThisSession);
                 }
 
                 document.getElementById('feedback').innerText = `🏆 Level ${currentLevel} 通關！` + rewardMsg;
-                speak(`太棒了！通關！`);
+                speakWord("太棒了！通關！");
+                document.getElementById('sentence-display').innerHTML = '';
                 document.getElementById('target-slots').innerHTML = '';
                 document.getElementById('grid-container').innerHTML = '';
                 updateScoreboard();
-
-                if (!userManuallySelected) {
-                    setTimeout(() => {
-                        let nextLevel = currentLevel + 1;
-                        const selectElem = document.getElementById('level-select');
-                        if (nextLevel <= selectElem.options.length) {
-                            loadLevel(nextLevel, false);
-                        }
-                    }, 3500);
-                }
                 return;
             }
 
@@ -320,9 +660,74 @@
             targetChars = sentenceStr.split('');
             shuffledChars = [...targetChars].sort(() => Math.random() - 0.5);
 
+            buildSentenceDisplay(targetChars);
             buildSlots();
             buildGrid();
-            playCurrentSentence();
+            playSentenceWithHighlight();
+        }
+
+        function buildSentenceDisplay(chars) {
+            const displayContainer = document.getElementById('sentence-display');
+            displayContainer.innerHTML = '';
+            chars.forEach((char, index) => {
+                const span = document.createElement('span');
+                span.className = 'highlight-word';
+                span.id = `hw-${index}`;
+                span.innerText = char;
+                displayContainer.appendChild(span);
+            });
+        }
+
+        function playSentenceWithHighlight() {
+            if (!gameActive) return;
+            const sentenceStr = currentPassages[currentSentenceIndex];
+            document.getElementById('feedback').innerText = '👀 請聼老師朗讀示範，觀察高亮文字！';
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(sentenceStr);
+                utterance.lang = 'zh-HK';
+                utterance.rate = 0.75;
+
+                utterance.onboundary = function(event) {
+                    if (event.name === 'word' || event.charIndex !== undefined) {
+                        let charIdx = event.charIndex;
+                        if (charIdx < targetChars.length) {
+                            document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
+                            const activeSpan = document.getElementById(`hw-${charIdx}`);
+                            if (activeSpan) {
+                                activeSpan.classList.add('active');
+                            }
+                        }
+                    }
+                };
+
+                utterance.onend = function() {
+                    document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
+                    document.getElementById('feedback').innerText = '👉 現在換你了！請按順序把卡片拖拽或點擊到上方的空格！';
+                };
+
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function repeatSentence() {
+            playSentenceWithHighlight();
+        }
+
+        function saveCompletionRecord(lvl, passages, wrongList) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const passageTitle = passages[0].substring(0, 4) + '...'; 
+            let history = JSON.parse(localStorage.getItem('study_completion_history') || '[]');
+            if (!history.some(r => r.date === todayStr && r.level === lvl)) {
+                history.push({
+                    date: todayStr,
+                    level: lvl,
+                    preview: passageTitle,
+                    wrongWords: [...new Set(wrongList)] 
+                });
+                localStorage.setItem('study_completion_history', JSON.stringify(history));
+            }
         }
 
         function buildSlots() {
@@ -332,6 +737,25 @@
                 const slot = document.createElement('div');
                 slot.className = 'slot-box';
                 slot.id = `slot-${i}`;
+
+                slot.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    slot.classList.add('drag-over');
+                });
+                slot.addEventListener('dragleave', () => {
+                    slot.classList.remove('drag-over');
+                });
+                slot.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    slot.classList.remove('drag-over');
+                    const char = e.dataTransfer.getData('text/plain');
+                    const tileId = e.dataTransfer.getData('tileId');
+                    const tileElem = document.getElementById(tileId);
+                    if (tileElem) {
+                        handleCardPlacement(char, i, tileElem);
+                    }
+                });
+
                 container.appendChild(slot);
             });
         }
@@ -345,21 +769,93 @@
                 tile.className = 'grid-tile';
                 tile.innerText = char;
                 tile.id = `tile-${index}`;
-                tile.onclick = () => handleTileClick(char, tile);
+                tile.draggable = true;
+
+                tile.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', char);
+                    e.dataTransfer.setData('tileId', tile.id);
+                });
+
+                tile.onclick = () => {
+                    if (!gameActive || tile.classList.contains('used')) return;
+                    handleCardPlacement(char, playerProgressIndex, tile);
+                };
+
                 container.appendChild(tile);
             });
         }
 
-        function playCurrentSentence() {
-            if (!gameActive) return;
-            const sentenceStr = currentPassages[currentSentenceIndex];
-            document.getElementById('feedback').innerText = '請聼句子，按順序選出正確的字！';
-            speak(sentenceStr);
+        function handleCardPlacement(selectedChar, slotIndex, tileElement) {
+            if (!gameActive || tileElement.classList.contains('used')) return;
+
+            const expectedChar = targetChars[playerProgressIndex];
+            totalWordsAttempted++;
+
+            if (slotIndex === playerProgressIndex && selectedChar === expectedChar) {
+                document.querySelectorAll('.grid-tile').forEach(t => t.classList.remove('glow'));
+
+                const slot = document.getElementById(`slot-${playerProgressIndex}`);
+                slot.innerText = selectedChar;
+                slot.classList.add('filled');
+                tileElement.classList.add('used');
+
+                document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
+                const activeWord = document.getElementById(`hw-${playerProgressIndex}`);
+                if (activeWord) activeWord.classList.add('active');
+                speakWord(selectedChar);
+
+                if (!hintUsedForThisWord) {
+                    organicCorrectCount++;
+                } else {
+                    wrongCount++; 
+                }
+
+                updateScoreboard();
+                playerProgressIndex++;
+                hintUsedForThisWord = false; 
+                document.getElementById('feedback').innerText = '👍 對啦！繼續拖拽下一個字！';
+
+                if (playerProgressIndex >= targetChars.length) {
+                    document.getElementById('feedback').innerText = '🎉 太棒了！這句完成！';
+                    
+                    completedSentencesCount++;
+                    totalSweets += 3; // Awards 3 candies directly upon completing a sentence
+                    saveSweetData();
+                    updateScoreboard();
+
+                    // Drop 3 candies sequentially right into the jar without popup cards
+                    dropCandiesDirectly(3);
+                }
+            } else {
+                wrongCount++;
+                wrongWordsThisSession.push(expectedChar); 
+                updateScoreboard();
+                document.getElementById('feedback').innerText = '❌ 順序不對哦，點擊「提示」按鈕看看！';
+                
+                document.querySelectorAll('.grid-tile').forEach(tile => {
+                    if (tile.innerText === expectedChar && !tile.classList.contains('used')) {
+                        tile.classList.add('glow');
+                    }
+                });
+
+                setTimeout(repeatSentence, 800);
+            }
         }
 
-        function repeatSentence() {
-            if (!gameActive) return;
-            speak(currentPassages[currentSentenceIndex]);
+        function dropCandiesDirectly(count) {
+            let dropped = 0;
+            const interval = setInterval(() => {
+                if (dropped < count) {
+                    spawnPhysicsCandy();
+                    dropped++;
+                } else {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        currentSentenceIndex++;
+                        loadSentence();
+                    }, 800);
+                }
+            }, 300);
         }
 
         function resetCurrentSentence() {
@@ -370,13 +866,14 @@
             document.querySelectorAll('.grid-tile').forEach(t => {
                 t.classList.remove('used', 'glow');
             });
-            document.getElementById('feedback').innerText = '已重設，請重新選字！';
+            document.getElementById('feedback').innerText = '已重設，請重新配對！';
         }
 
         function requestHint() {
             if (!gameActive) return;
             hintUsedForThisWord = true; 
             const expectedChar = targetChars[playerProgressIndex];
+            wrongWordsThisSession.push(expectedChar); 
 
             document.querySelectorAll('.grid-tile').forEach(tile => {
                 if (tile.innerText === expectedChar && !tile.classList.contains('used')) {
@@ -386,7 +883,7 @@
             document.getElementById('feedback').innerText = '💡 提示：發光的字就是下一個正確的字！';
         }
 
-        function speak(text) {
+        function speakWord(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
@@ -400,50 +897,73 @@
             document.getElementById('stat-correct').innerText = organicCorrectCount;
             document.getElementById('stat-wrong').innerText = wrongCount;
             document.getElementById('stat-coins').innerText = coins;
+            document.getElementById('stat-sweets').innerText = totalSweets;
+            document.getElementById('stat-sentences').innerText = completedSentencesCount;
         }
 
-        function handleTileClick(selectedChar, tileElement) {
-            if (!gameActive || tileElement.classList.contains('used')) return;
+        function openParentPortal() {
+            document.getElementById('parent-modal').style.display = 'flex';
+            document.getElementById('parent-pin').value = '';
+            document.getElementById('pin-error').innerText = '';
+            document.getElementById('parent-body').innerHTML = `
+                <p>請輸入家長密碼 (預設: 1234)：</p>
+                <input type="password" id="parent-pin" style="padding: 6px; font-size: 16px; width: 120px;" placeholder="PIN">
+                <button onclick="verifyPin()" style="padding: 6px 14px; font-size: 14px;">確認</button>
+                <div id="pin-error" style="color: red; font-size: 13px; margin-top: 5px;"></div>
+                <br><button onclick="closeParentPortal()" style="background:#ccc; margin-top:10px; padding:4px 10px; font-size:13px;">關閉</button>
+            `;
+        }
 
-            const expectedChar = targetChars[playerProgressIndex];
-            totalWordsAttempted++;
+        function closeParentPortal() {
+            document.getElementById('parent-modal').style.display = 'none';
+        }
 
-            if (selectedChar === expectedChar) {
-                document.querySelectorAll('.grid-tile').forEach(t => t.classList.remove('glow'));
-
-                const slot = document.getElementById(`slot-${playerProgressIndex}`);
-                slot.innerText = selectedChar;
-                slot.classList.add('filled');
-                tileElement.classList.add('used');
-
-                if (!hintUsedForThisWord) {
-                    organicCorrectCount++;
-                } else {
-                    wrongCount++; 
-                }
-
-                updateScoreboard();
-                playerProgressIndex++;
-                hintUsedForThisWord = false; 
-                document.getElementById('feedback').innerText = '👍 對啦！繼續選下一個字！';
-
-                if (playerProgressIndex >= targetChars.length) {
-                    document.getElementById('feedback').innerText = '🎉 太棒了！這句完成！';
-                    currentSentenceIndex++;
-                    setTimeout(loadSentence, 1200);
-                }
+        function verifyPin() {
+            const pin = document.getElementById('parent-pin').value;
+            if (pin === '1234') {
+                renderParentDashboard();
             } else {
-                wrongCount++;
-                updateScoreboard();
-                document.getElementById('feedback').innerText = '❌ 順序不對哦，點擊「提示」按鈕看看！';
-                
-                document.querySelectorAll('.grid-tile').forEach(tile => {
-                    if (tile.innerText === expectedChar && !tile.classList.contains('used')) {
-                        tile.classList.add('glow');
-                    }
-                });
+                document.getElementById('pin-error').innerText = '❌ 密碼錯誤！';
+            }
+        }
 
-                setTimeout(repeatSentence, 800);
+        function renderParentDashboard() {
+            const history = JSON.parse(localStorage.getItem('study_completion_history') || '[]');
+            
+            let html = `<h3>📊 學習日誌報表</h3>`;
+            html += `<p><b>🍬 總獲得糖果數：</b> ${totalSweets} 顆</p>`;
+            if (history.length === 0) {
+                html += `<p>暫無通關記錄。完成 Level 並獲得 90% 以上正確率即可記錄。</p>`;
+            } else {
+                history.forEach(item => {
+                    html += `
+                        <div class="log-entry">
+                            <b>📅 日期：</b> ${item.date}<br>
+                            <b>🎯 關卡：</b> Level ${item.level} (預覽: ${item.preview})<br>
+                            <b>🔴 需要加強的字：</b> ${item.wrongWords.length > 0 ? item.wrongWords.join(', ') : '無 (全部完美答對！)'}
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button onclick="clearHistory()" style="background-color:#ff7675; padding: 6px 12px; font-size: 13px;">清除記錄</button>
+                    <button onclick="closeParentPortal()" style="background-color:#b5ead7; color:#333; padding: 6px 12px; font-size: 13px;">關閉</button>
+                </div>
+            `;
+            document.getElementById('parent-body').innerHTML = html;
+        }
+
+        function clearHistory() {
+            if (confirm('確定要清除所有學習記錄與糖果數嗎？')) {
+                localStorage.removeItem('study_completion_history');
+                localStorage.removeItem('kid_total_sweets');
+                localStorage.removeItem('kid_completed_sentences');
+                totalSweets = 0;
+                completedSentencesCount = 0;
+                updateScoreboard();
+                renderParentDashboard();
             }
         }
     </script>
