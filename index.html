@@ -386,9 +386,7 @@
             <div class="basket-header">🍬 糖果罐<br>(已完成句子: <span id="stat-sentences">0</span>)</div>
             <button class="clear-candies-btn" onclick="clearAllCandies()">🗑️ 清空糖果</button>
             <div class="container-wrapper">
-                <!-- Physics canvas simulation underneath -->
                 <canvas id="candy-canvas" width="140" height="380"></canvas>
-                <!-- Jar background image overlay with pointer-events: none -->
                 <img src="container.png" alt="Jar" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 10; pointer-events: none; mix-blend-mode: multiply;">
             </div>
         </div>
@@ -407,37 +405,38 @@
     </div>
 
     <script>
-        // ==========================================
-        // 🎛️ ADJUST YOUR PNG CANDY SCALE HERE
-        // ==========================================
         const CANDY_CONFIG = {
             jarWidth: 200,
-            scale: 0.05,         // Adjust candy size here if needed
+            scale: 0.05,         
             bodyWidth: 30,       
             bodyHeight: 30,      
             restitution: 0.9,    
             friction: 0.8        
         };
-        // ==========================================
 
         let physicsEngine, physicsRender, physicsRunner;
-        let candyImages = [];
+        let candyImages = [
+            'candy_bow_2.png',
+            'candy_bow_8.png',
+            'candy_bow_9.png',
+            'candy_bow_15.png'
+        ];
 
-function initPhysicsJar() {
+        function initPhysicsJar() {
             const { Engine, Render, Runner, Bodies, Composite } = Matter;
 
             physicsEngine = Engine.create();
-            physicsEngine.world.gravity.y = 1;
+            physicsEngine.world.gravity.y = 2.5; 
 
             const canvas = document.getElementById('candy-canvas');
-            canvas.width = CANDY_CONFIG.jarWidth; // Uses your config width
+            canvas.width = CANDY_CONFIG.jarWidth;
             canvas.height = 380;
 
             physicsRender = Render.create({
                 canvas: canvas,
                 engine: physicsEngine,
                 options: {
-                    width: CANDY_CONFIG.jarWidth, // Uses your config width
+                    width: CANDY_CONFIG.jarWidth,
                     height: 380,
                     wireframes: false,
                     background: 'transparent'
@@ -448,17 +447,11 @@ function initPhysicsJar() {
             physicsRunner = Runner.create();
             Runner.run(physicsRunner, physicsEngine);
 
-            // Boundaries automatically adjust based on the width
             const halfW = CANDY_CONFIG.jarWidth / 2;
-            const ground = Bodies.rectangle(halfW, 390, CANDY_CONFIG.jarWidth, 20, { isStatic: true, render: { visible: false } });
-            const leftWall = Bodies.rectangle(-5, 190, 20, 380, { isStatic: true, render: { visible: false } });
-            const rightWall = Bodies.rectangle(CANDY_CONFIG.jarWidth + 5, 190, 20, 380, { isStatic: true, render: { visible: false } });
+            const ground = Bodies.rectangle(halfW, 400, CANDY_CONFIG.jarWidth + 20, 40, { isStatic: true, render: { visible: false } });
+            const leftWall = Bodies.rectangle(-10, 190, 20, 400, { isStatic: true, render: { visible: false } });
+            const rightWall = Bodies.rectangle(CANDY_CONFIG.jarWidth + 10, 190, 20, 400, { isStatic: true, render: { visible: false } });
             Composite.add(physicsEngine.world, [ground, leftWall, rightWall]);
-
-            candyImages = [];
-            for (let i = 1; i <= 18; i++) {
-                candyImages.push(`candy${i}.png`);
-            }
         }
 
         function clearAllCandies() {
@@ -476,9 +469,14 @@ function initPhysicsJar() {
             const { Bodies, Composite } = Matter;
             if (!physicsEngine) return;
 
+            const allBodies = Composite.allBodies(physicsEngine.world).filter(b => !b.isStatic);
+            if (allBodies.length > 30) {
+                Composite.remove(physicsEngine.world, allBodies[0]);
+            }
+
             const randomImg = candyImages[Math.floor(Math.random() * candyImages.length)];
-            const startX = 50 + Math.random() * 40;
-            const startY = -20 - (Math.random() * 20);
+            const startX = 60 + Math.random() * 40;
+            const startY = -10 - (Math.random() * 10);
 
             const candy = Bodies.rectangle(startX, startY, CANDY_CONFIG.bodyWidth, CANDY_CONFIG.bodyHeight, {
                 restitution: CANDY_CONFIG.restitution,
@@ -499,10 +497,10 @@ function initPhysicsJar() {
 
         function loadInitialPhysicsCandies(count) {
             if (!physicsEngine) return;
-            for (let i = 0; i < count; i++) {
+            for (let i = 0; i < Math.min(count, 30); i++) {
                 const { Bodies, Composite } = Matter;
                 const randomImg = candyImages[i % candyImages.length];
-                const x = 30 + (i * 20) % 85;
+                const x = 40 + (i * 15) % 100;
                 const y = 350 - (Math.floor(i / 4) * 18);
                 
                 const candy = Bodies.rectangle(x, y, CANDY_CONFIG.bodyWidth, CANDY_CONFIG.bodyHeight, {
@@ -521,7 +519,6 @@ function initPhysicsJar() {
             }
         }
 
-        // --- Game Logic ---
         let currentPassages = [];
         let currentLevel = 1;
         let currentSentenceIndex = 0;
@@ -614,7 +611,7 @@ function initPhysicsJar() {
             } else if (lvl === 2 && typeof passagesLevel2 !== 'undefined') {
                 currentPassages = passagesLevel2;
             } else {
-                currentPassages = ["載入失敗"];
+                currentPassages = ["載入失敗 - 請檢查 passage1.js / passage2.js"];
             }
 
             organicCorrectCount = 0;
@@ -681,33 +678,36 @@ function initPhysicsJar() {
         function playSentenceWithHighlight() {
             if (!gameActive) return;
             const sentenceStr = currentPassages[currentSentenceIndex];
-            document.getElementById('feedback').innerText = '👀 請聼老師朗讀示範，觀察高亮文字！';
+            document.getElementById('feedback').innerText = '👉 現在換你了！請按順序把卡片拖拽或點擊到上方的空格！';
 
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(sentenceStr);
-                utterance.lang = 'zh-HK';
-                utterance.rate = 0.75;
+            try {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(sentenceStr);
+                    utterance.lang = 'zh-HK';
+                    utterance.rate = 0.75;
 
-                utterance.onboundary = function(event) {
-                    if (event.name === 'word' || event.charIndex !== undefined) {
-                        let charIdx = event.charIndex;
-                        if (charIdx < targetChars.length) {
-                            document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
-                            const activeSpan = document.getElementById(`hw-${charIdx}`);
-                            if (activeSpan) {
-                                activeSpan.classList.add('active');
+                    utterance.onboundary = function(event) {
+                        if (event.name === 'word' || event.charIndex !== undefined) {
+                            let charIdx = event.charIndex;
+                            if (charIdx < targetChars.length) {
+                                document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
+                                const activeSpan = document.getElementById(`hw-${charIdx}`);
+                                if (activeSpan) {
+                                    activeSpan.classList.add('active');
+                                }
                             }
                         }
-                    }
-                };
+                    };
 
-                utterance.onend = function() {
-                    document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
-                    document.getElementById('feedback').innerText = '👉 現在換你了！請按順序把卡片拖拽或點擊到上方的空格！';
-                };
+                    utterance.onend = function() {
+                        document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
+                    };
 
-                window.speechSynthesis.speak(utterance);
+                    window.speechSynthesis.speak(utterance);
+                }
+            } catch(e) {
+                console.log("Speech synthesis bypassed");
             }
         }
 
@@ -819,11 +819,10 @@ function initPhysicsJar() {
                     document.getElementById('feedback').innerText = '🎉 太棒了！這句完成！';
                     
                     completedSentencesCount++;
-                    totalSweets += 3; // Awards 3 candies directly upon completing a sentence
+                    totalSweets += 3; 
                     saveSweetData();
                     updateScoreboard();
 
-                    // Drop 3 candies sequentially right into the jar without popup cards
                     dropCandiesDirectly(3);
                 }
             } else {
