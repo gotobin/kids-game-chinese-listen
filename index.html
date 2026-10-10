@@ -537,6 +537,11 @@
         let totalSweets = 0;
         let wrongWordsThisSession = []; 
 
+        // Check if Blind Listening Mode is enabled in localStorage
+        function isBlindMode() {
+            return localStorage.getItem('kid_blind_mode') === 'true';
+        }
+
         window.onload = function() {
             initPhysicsJar();
             loadSweetData();
@@ -666,19 +671,34 @@
         function buildSentenceDisplay(chars) {
             const displayContainer = document.getElementById('sentence-display');
             displayContainer.innerHTML = '';
-            chars.forEach((char, index) => {
-                const span = document.createElement('span');
-                span.className = 'highlight-word';
-                span.id = `hw-${index}`;
-                span.innerText = char;
-                displayContainer.appendChild(span);
-            });
-        }
+            
+            
+            if (isBlindMode()) {
+                // Blind Listening Mode: Hide sentence text, show listening prompt placeholder
+                const msg = document.createElement('div');
+                msg.style.color = '#5c8374';
+                msg.style.fontSize = '20px';
+                msg.innerText = '🎧 【盲聽模式】請仔細聆聽語音，不要看文字！';
+                msg.innerText = ' ';
+                displayContainer.appendChild(msg);
+            } else {
+                // Normal Mode: Display the full sentence with highlights
+                chars.forEach((char, index) => {
+                    const span = document.createElement('span');
+                    span.className = 'highlight-word';
+                    span.id = `hw-${index}`;
+                    span.innerText = char;
+                    displayContainer.appendChild(span);
+                });
+            }
+        }  
 
         function playSentenceWithHighlight() {
             if (!gameActive) return;
             const sentenceStr = currentPassages[currentSentenceIndex];
-            document.getElementById('feedback').innerText = '👉 現在換你了！請按順序把卡片拖拽或點擊到上方的空格！';
+            document.getElementById('feedback').innerText = isBlindMode() ? 
+                '🎧 請專心聼語音示範，然後按順序砌出正確的字！' : 
+                '👉 現在換你了！請按順序把卡片拖拽或點擊到上方的空格！';
 
             try {
                 if ('speechSynthesis' in window) {
@@ -688,7 +708,7 @@
                     utterance.rate = 0.75;
 
                     utterance.onboundary = function(event) {
-                        if (event.name === 'word' || event.charIndex !== undefined) {
+                        if (!isBlindMode() && (event.name === 'word' || event.charIndex !== undefined)) {
                             let charIdx = event.charIndex;
                             if (charIdx < targetChars.length) {
                                 document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
@@ -701,7 +721,9 @@
                     };
 
                     utterance.onend = function() {
-                        document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
+                        if (!isBlindMode()) {
+                            document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
+                        }
                     };
 
                     window.speechSynthesis.speak(utterance);
@@ -799,9 +821,12 @@
                 slot.classList.add('filled');
                 tileElement.classList.add('used');
 
-                document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
-                const activeWord = document.getElementById(`hw-${playerProgressIndex}`);
-                if (activeWord) activeWord.classList.add('active');
+                if (!isBlindMode()) {
+                    document.querySelectorAll('.highlight-word').forEach(el => el.classList.remove('active'));
+                    const activeWord = document.getElementById(`hw-${playerProgressIndex}`);
+                    if (activeWord) activeWord.classList.add('active');
+                }
+                
                 speakWord(selectedChar);
 
                 if (!hintUsedForThisWord) {
@@ -904,13 +929,7 @@
             document.getElementById('parent-modal').style.display = 'flex';
             document.getElementById('parent-pin').value = '';
             document.getElementById('pin-error').innerText = '';
-            document.getElementById('parent-body').innerHTML = `
-                <p>請輸入家長密碼 (預設: 1234)：</p>
-                <input type="password" id="parent-pin" style="padding: 6px; font-size: 16px; width: 120px;" placeholder="PIN">
-                <button onclick="verifyPin()" style="padding: 6px 14px; font-size: 14px;">確認</button>
-                <div id="pin-error" style="color: red; font-size: 13px; margin-top: 5px;"></div>
-                <br><button onclick="closeParentPortal()" style="background:#ccc; margin-top:10px; padding:4px 10px; font-size:13px;">關閉</button>
-            `;
+            renderParentDashboard();
         }
 
         function closeParentPortal() {
@@ -928,8 +947,17 @@
 
         function renderParentDashboard() {
             const history = JSON.parse(localStorage.getItem('study_completion_history') || '[]');
+            const blindChecked = isBlindMode() ? 'checked' : '';
             
-            let html = `<h3>📊 學習日誌報表</h3>`;
+            let html = `<h3>📊 學習日誌與設定</h3>`;
+            html += `
+                <div style="background: #f0f7f4; padding: 12px; border-radius: 12px; margin-bottom: 15px; border: 2px solid #b4e197;">
+                    <label style="cursor: pointer; font-size: 15px; font-weight: bold; color: #5c8374;">
+                        <input type="checkbox" id="blind-mode-checkbox" ${blindChecked} onchange="toggleBlindModeSetting(this)" style="width: 18px; height: 18px; vertical-align: middle;"> 
+                        🎧 啟用盲聽模式 (隱藏文字提示，純靠聼音砌字)
+                    </label>
+                </div>
+            `;
             html += `<p><b>🍬 總獲得糖果數：</b> ${totalSweets} 顆</p>`;
             if (history.length === 0) {
                 html += `<p>暫無通關記錄。完成 Level 並獲得 90% 以上正確率即可記錄。</p>`;
@@ -952,6 +980,12 @@
                 </div>
             `;
             document.getElementById('parent-body').innerHTML = html;
+        }
+
+        function toggleBlindModeSetting(checkbox) {
+            localStorage.setItem('kid_blind_mode', checkbox.checked);
+            // Reload current sentence to apply the setting immediately
+            loadSentence();
         }
 
         function clearHistory() {
