@@ -411,7 +411,7 @@
             bodyWidth: 30,       
             bodyHeight: 30,      
             restitution: 0.9,    
-            friction: 0.8        
+            friction: 0.1       
         };
 
         let physicsEngine, physicsRender, physicsRunner;
@@ -426,7 +426,7 @@
             const { Engine, Render, Runner, Bodies, Composite } = Matter;
 
             physicsEngine = Engine.create();
-            physicsEngine.world.gravity.y = 2.5; 
+            physicsEngine.world.gravity.y = 1; 
 
             const canvas = document.getElementById('candy-canvas');
             canvas.width = CANDY_CONFIG.jarWidth;
