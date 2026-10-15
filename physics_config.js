@@ -7,8 +7,8 @@ function generateCandyList(prefix, count) {
 }
 
 const maxCounts = {
-    bow: 3,
-    ball: 2,
+    bow: 4,
+    ball: 5,
     long: 3,
     cute: 4
 };
