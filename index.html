@@ -8,6 +8,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script src="passage1.js"></script>
     <script src="passage2.js"></script>
+    <script src="physics_config.js"></script>
+
+
     <style>
         body {
             font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
@@ -356,6 +359,7 @@
                     <select id="level-select" onchange="manualSelectLevel()">
                         <option value="1">Level 1</option>
                         <option value="2">Level 2</option>
+                        <option value="3">Level 3</option>
                     </select>
                 </div>
                 <button class="parent-btn" onclick="openParentPortal()">🔒 家長專區</button>
@@ -405,39 +409,25 @@
     </div>
 
     <script>
-        const CANDY_CONFIG = {
-            jarWidth: 200,
-            scale: 0.05,         
-            bodyWidth: 30,       
-            bodyHeight: 30,      
-            restitution: 0.9,    
-            friction: 0.1       
-        };
-
         let physicsEngine, physicsRender, physicsRunner;
-        let candyImages = [
-            'candy_bow_2.png',
-            'candy_bow_8.png',
-            'candy_bow_9.png',
-            'candy_bow_15.png'
-        ];
+        let currentCandyGroup = []; // Holds active candy array for the current level
 
         function initPhysicsJar() {
             const { Engine, Render, Runner, Bodies, Composite } = Matter;
 
             physicsEngine = Engine.create();
-            physicsEngine.world.gravity.y = 1; 
+            physicsEngine.world.gravity.y = CANDY_CONFIG.gravityY; 
 
             const canvas = document.getElementById('candy-canvas');
             canvas.width = CANDY_CONFIG.jarWidth;
-            canvas.height = 380;
+            canvas.height = CANDY_CONFIG.jarHeight;
 
             physicsRender = Render.create({
                 canvas: canvas,
                 engine: physicsEngine,
                 options: {
                     width: CANDY_CONFIG.jarWidth,
-                    height: 380,
+                    height: CANDY_CONFIG.jarHeight,
                     wireframes: false,
                     background: 'transparent'
                 }
@@ -448,9 +438,15 @@
             Runner.run(physicsRunner, physicsEngine);
 
             const halfW = CANDY_CONFIG.jarWidth / 2;
-            const ground = Bodies.rectangle(halfW, 400, CANDY_CONFIG.jarWidth + 20, 40, { isStatic: true, render: { visible: false } });
-            const leftWall = Bodies.rectangle(-10, 190, 20, 400, { isStatic: true, render: { visible: false } });
-            const rightWall = Bodies.rectangle(CANDY_CONFIG.jarWidth + 10, 190, 20, 400, { isStatic: true, render: { visible: false } });
+            const groundY = CANDY_CONFIG.jarHeight - (CANDY_CONFIG.groundHeight / 2);
+            const ground = Bodies.rectangle(halfW, groundY, CANDY_CONFIG.jarWidth + 20, CANDY_CONFIG.groundHeight, { 
+                isStatic: true, 
+                render: { visible: false } 
+            });
+
+            const leftWall = Bodies.rectangle(-10, CANDY_CONFIG.jarHeight / 2, 20, CANDY_CONFIG.jarHeight * 2, { isStatic: true, render: { visible: false } });
+            const rightWall = Bodies.rectangle(CANDY_CONFIG.jarWidth + 10, CANDY_CONFIG.jarHeight / 2, 20, CANDY_CONFIG.jarHeight * 2, { isStatic: true, render: { visible: false } });
+            
             Composite.add(physicsEngine.world, [ground, leftWall, rightWall]);
         }
 
@@ -470,17 +466,18 @@
             if (!physicsEngine) return;
 
             const allBodies = Composite.allBodies(physicsEngine.world).filter(b => !b.isStatic);
-            if (allBodies.length > 30) {
+            if (allBodies.length > CANDY_CONFIG.maxCandies) {
                 Composite.remove(physicsEngine.world, allBodies[0]);
             }
 
-            const randomImg = candyImages[Math.floor(Math.random() * candyImages.length)];
+            const randomImg = currentCandyGroup[Math.floor(Math.random() * currentCandyGroup.length)];
             const startX = 60 + Math.random() * 40;
             const startY = -10 - (Math.random() * 10);
 
             const candy = Bodies.rectangle(startX, startY, CANDY_CONFIG.bodyWidth, CANDY_CONFIG.bodyHeight, {
                 restitution: CANDY_CONFIG.restitution,
                 friction: CANDY_CONFIG.friction,
+                frictionStatic: CANDY_CONFIG.frictionStatic,
                 angle: Math.random() * Math.PI,
                 render: {
                     sprite: {
@@ -497,15 +494,16 @@
 
         function loadInitialPhysicsCandies(count) {
             if (!physicsEngine) return;
-            for (let i = 0; i < Math.min(count, 30); i++) {
+            for (let i = 0; i < Math.min(count, CANDY_CONFIG.maxCandies); i++) {
                 const { Bodies, Composite } = Matter;
-                const randomImg = candyImages[i % candyImages.length];
+                const randomImg = currentCandyGroup[i % currentCandyGroup.length];
                 const x = 40 + (i * 15) % 100;
                 const y = 350 - (Math.floor(i / 4) * 18);
                 
                 const candy = Bodies.rectangle(x, y, CANDY_CONFIG.bodyWidth, CANDY_CONFIG.bodyHeight, {
                     restitution: CANDY_CONFIG.restitution,
                     friction: CANDY_CONFIG.friction,
+                    frictionStatic: CANDY_CONFIG.frictionStatic,
                     angle: Math.random() * Math.PI,
                     render: {
                         sprite: {
@@ -537,9 +535,10 @@
         let totalSweets = 0;
         let wrongWordsThisSession = []; 
 
-        // Check if Blind Listening Mode is enabled in localStorage
+        // Blind mode is now determined by the active level's configuration
         function isBlindMode() {
-            return localStorage.getItem('kid_blind_mode') === 'true';
+            const config = CANDY_CONFIG.levelConfig[currentLevel];
+            return config ? config.blindMode : false;
         }
 
         window.onload = function() {
@@ -596,15 +595,26 @@
             loadLevel(selected, true);
         }
 
-        function isLevelCompletedToday(lvl) {
+        // Check daily play limits based on config instead of just a binary completed check
+        function getLevelPlayCountToday(lvl) {
             const todayStr = new Date().toISOString().split('T')[0]; 
             const history = JSON.parse(localStorage.getItem('study_completion_history') || '[]');
-            return history.some(record => record.date === todayStr && record.level === lvl);
+            const todayRecord = history.find(record => record.date === todayStr && record.level === lvl);
+            return todayRecord ? todayRecord.playsCount || 1 : 0;
         }
 
-        function loadLevel(lvl, isManual) {
+        function isLevelCompletedToday(lvl) {
+            const config = CANDY_CONFIG.levelConfig[lvl];
+            if (!config) return false;
+            return getLevelPlayCountToday(lvl) >= config.maxDailyPlays;
+        }
+
+function loadLevel(lvl, isManual) {
+            const config = CANDY_CONFIG.levelConfig[lvl];
+            if (!config) return;
+
             if (isLevelCompletedToday(lvl)) {
-                alert(`🌟 Level ${lvl} 今天已經順利通關過囉！`);
+                alert(`🌟 Level ${lvl} 今天已經達到遊玩上限 (${config.maxDailyPlays} 次) 囉！請明天再來挑戰。`);
                 lvl = 1;
             }
 
@@ -615,9 +625,14 @@
                 currentPassages = passagesLevel1;
             } else if (lvl === 2 && typeof passagesLevel2 !== 'undefined') {
                 currentPassages = passagesLevel2;
+            } else if (lvl === 3 && typeof passagesLevel2 !== 'undefined') {
+                currentPassages = passagesLevel2; // Or your level 3 passages variable
             } else {
-                currentPassages = ["載入失敗 - 請檢查 passage1.js / passage2.js"];
+                currentPassages = ["載入失敗 - 請檢查 passages"];
             }
+
+            // Automatically pick candy group from config mapping
+            currentCandyGroup = CANDY_CONFIG.candyGroups[config.group];
 
             organicCorrectCount = 0;
             totalWordsAttempted = 0;
@@ -672,17 +687,13 @@
             const displayContainer = document.getElementById('sentence-display');
             displayContainer.innerHTML = '';
             
-            
             if (isBlindMode()) {
-                // Blind Listening Mode: Hide sentence text, show listening prompt placeholder
                 const msg = document.createElement('div');
                 msg.style.color = '#5c8374';
                 msg.style.fontSize = '20px';
-                msg.innerText = '🎧 【盲聽模式】請仔細聆聽語音，不要看文字！';
                 msg.innerText = ' ';
                 displayContainer.appendChild(msg);
             } else {
-                // Normal Mode: Display the full sentence with highlights
                 chars.forEach((char, index) => {
                     const span = document.createElement('span');
                     span.className = 'highlight-word';
@@ -737,19 +748,25 @@
             playSentenceWithHighlight();
         }
 
-        function saveCompletionRecord(lvl, passages, wrongList) {
+function saveCompletionRecord(lvl, passages, wrongList) {
             const todayStr = new Date().toISOString().split('T')[0];
             const passageTitle = passages[0].substring(0, 4) + '...'; 
             let history = JSON.parse(localStorage.getItem('study_completion_history') || '[]');
-            if (!history.some(r => r.date === todayStr && r.level === lvl)) {
+            
+            let record = history.find(r => r.date === todayStr && r.level === lvl);
+            if (record) {
+                record.playsCount = (record.playsCount || 1) + 1;
+                record.wrongWords = [...new Set([...record.wrongWords, ...wrongList])];
+            } else {
                 history.push({
                     date: todayStr,
                     level: lvl,
                     preview: passageTitle,
+                    playsCount: 1,
                     wrongWords: [...new Set(wrongList)] 
                 });
-                localStorage.setItem('study_completion_history', JSON.stringify(history));
             }
+            localStorage.setItem('study_completion_history', JSON.stringify(history));
         }
 
         function buildSlots() {
@@ -984,7 +1001,6 @@
 
         function toggleBlindModeSetting(checkbox) {
             localStorage.setItem('kid_blind_mode', checkbox.checked);
-            // Reload current sentence to apply the setting immediately
             loadSentence();
         }
 
