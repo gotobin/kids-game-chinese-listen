@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script src="passage1.js"></script>
     <script src="passage2.js"></script>
+    <script src="passage3.js"></script>
     <script src="physics_config.js"></script>
 
 
@@ -625,8 +626,8 @@ function loadLevel(lvl, isManual) {
                 currentPassages = passagesLevel1;
             } else if (lvl === 2 && typeof passagesLevel2 !== 'undefined') {
                 currentPassages = passagesLevel2;
-            } else if (lvl === 3 && typeof passagesLevel2 !== 'undefined') {
-                currentPassages = passagesLevel2; // Or your level 3 passages variable
+            } else if (lvl === 3 && typeof passagesLevel3 !== 'undefined') {
+                currentPassages = passagesLevel3; // Or your level 3 passages variable
             } else {
                 currentPassages = ["載入失敗 - 請檢查 passages"];
             }

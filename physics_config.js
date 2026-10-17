@@ -46,6 +46,6 @@ const CANDY_CONFIG = {
     levelConfig: {
         1: { group: 'bow', blindMode: false, maxDailyPlays: 3 },
         2: { group: 'ball', blindMode: true, maxDailyPlays: 3 },
-        3: { group: 'bow', blindMode: true, maxDailyPlays: 2 }
+        3: { group: 'mix', blindMode: false, maxDailyPlays: 2 }
     }
 };
