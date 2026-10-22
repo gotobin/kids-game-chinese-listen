@@ -19,6 +19,7 @@ const ballList = generateCandyList('candy_ball', maxCounts.ball);
 const longList = generateCandyList('candy_long', maxCounts.long);
 const cuteList = generateCandyList('candy_cute', maxCounts.cute);
 
+
 const CANDY_CONFIG = {
     jarWidth: 200,
     jarHeight: 380,
@@ -34,18 +35,23 @@ const CANDY_CONFIG = {
     
     maxCounts: maxCounts,
 
-    // Regular object property instead of a getter function
+    // Define which levels are active and displayed in the dropdown menu
+    activeLevels: [1, 2, 3, 5],
+
     candyGroups: {
         bow: bowList,
         ball: ballList,
         long: longList,
         cute: cuteList,
+        bowball: [...bowList, ...ballList],
         mix: [...bowList, ...ballList, ...longList, ...cuteList]
     },
 
     levelConfig: {
-        1: { group: 'bow', blindMode: false, maxDailyPlays: 3 },
-        2: { group: 'ball', blindMode: true, maxDailyPlays: 3 },
-        3: { group: 'mix', blindMode: false, maxDailyPlays: 2 }
+        1: { group: 'bow', blindMode: false, maxDailyPlays: 3, name: 'Level 1' },
+        2: { group: 'bowball', blindMode: false, maxDailyPlays: 3, name: 'Level 2' },
+        3: { group: 'mix', blindMode: false, maxDailyPlays: 2, name: 'Level 3' },
+        4: { group: 'cute', blindMode: false, maxDailyPlays: 3, name: 'Level 4' },
+        5: { group: 'cute', blindMode: false, maxDailyPlays: 3, name: 'Level 5 (Book Reading)' }
     }
 };

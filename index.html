@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>漢字聼音砌字大冒險</title>
+    <title>漢字聼音砌字大冒險 & English Reading</title>
     <!-- Matter.js Physics Engine CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
     <script src="passage1.js"></script>
     <script src="passage2.js"></script>
     <script src="passage3.js"></script>
+    <script src="passage4.js"></script>
+    <script src="passage5.js"></script> <!-- Level 5 Book Pages -->
     <script src="physics_config.js"></script>
-
 
     <style>
         body {
@@ -171,6 +172,7 @@
             font-weight: bold;
             min-height: 50px;
             align-items: center;
+            flex-wrap: wrap;
         }
 
         .highlight-word {
@@ -358,9 +360,7 @@
                 <div class="level-selector">
                     🎯 選擇關卡：
                     <select id="level-select" onchange="manualSelectLevel()">
-                        <option value="1">Level 1</option>
-                        <option value="2">Level 2</option>
-                        <option value="3">Level 3</option>
+                        <!-- Dynamically populated from config -->
                     </select>
                 </div>
                 <button class="parent-btn" onclick="openParentPortal()">🔒 家長專區</button>
@@ -369,7 +369,6 @@
             <div class="stats-bar">
                 <div>🟢 正確: <span id="stat-correct">0</span></div>
                 <div>🔴 錯誤: <span id="stat-wrong">0</span></div>
-                <div>🪙 金幣: <span id="stat-coins">0</span></div>
                 <div>🍬 糖果: <span id="stat-sweets">0</span></div>
             </div>
 
@@ -411,7 +410,7 @@
 
     <script>
         let physicsEngine, physicsRender, physicsRunner;
-        let currentCandyGroup = []; // Holds active candy array for the current level
+        let currentCandyGroup = []; 
 
         function initPhysicsJar() {
             const { Engine, Render, Runner, Bodies, Composite } = Matter;
@@ -526,27 +525,155 @@
         let playerProgressIndex = 0;
         let gameActive = false;
         let userManuallySelected = false;
+        let sentenceHasHinted = false;
 
         let organicCorrectCount = 0; 
         let hintUsedForThisWord = false; 
         let totalWordsAttempted = 0;
         let wrongCount = 0;
-        let coins = 0;
         let completedSentencesCount = 0;
         let totalSweets = 0;
         let wrongWordsThisSession = []; 
 
-        // Blind mode is now determined by the active level's configuration
+        let activeRecognition = null;
+        let capturedTranscript = "";
+
+        // Level 5 Press-and-Hold Book Page Recognition Handler
+        function startRecordingPage(expectedPageText) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("抱歉，您的瀏覽器不支援語音辨識功能。");
+                return;
+            }
+
+            if (activeRecognition) return;
+
+            capturedTranscript = "";
+            activeRecognition = new SpeechRecognition();
+            activeRecognition.lang = 'en-US';
+            activeRecognition.interimResults = true; 
+            activeRecognition.maxAlternatives = 1;
+
+            activeRecognition.onresult = function(event) {
+                let interim = "";
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    interim += event.results[i][0].transcript;
+                }
+                capturedTranscript = interim.trim();
+                document.getElementById('feedback').innerText = `🎧 聆聽中: "${capturedTranscript}"`;
+            };
+
+            activeRecognition.onerror = function() {
+                document.getElementById('feedback').innerText = '⚠️ 收音發生狀況，請再試一次。';
+            };
+
+            activeRecognition.onend = function() {
+                if (capturedTranscript) {
+                    evaluateBookPage(capturedTranscript, expectedPageText);
+                }
+                activeRecognition = null;
+            };
+
+            try {
+                activeRecognition.start();
+                document.getElementById('feedback').innerText = '🎤 正在聆聽整頁... 請保持按住並朗讀！';
+            } catch(e) {
+                activeRecognition = null;
+            }
+        }
+
+        function stopRecordingPage() {
+            if (activeRecognition) {
+                try {
+                    activeRecognition.stop(); 
+                } catch(e) {
+                    activeRecognition = null;
+                }
+            }
+        }
+
+function evaluateBookPage(spokenText, expectedPageText) {
+            // Clean punctuation and normalize spacing for comparison
+            const cleanExpected = expectedPageText.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?]/g, "").replace(/\s+/g, " ").trim();
+            const cleanSpoken = spokenText.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?]/g, "").replace(/\s+/g, " ").trim();
+
+            totalWordsAttempted++;
+
+            const expectedWords = expectedPageText.split(' '); // Keep original punctuation/casing for display
+            const spokenWordsList = cleanSpoken.split(' ');
+
+            let unmatchedWords = [];
+            let matchedCount = 0;
+
+            // Check each word from the book page against what was spoken
+            let renderedWordsHtml = expectedWords.map(origWord => {
+                const cleanWord = origWord.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?]/g, "");
+                if (cleanSpoken.includes(cleanWord)) {
+                    matchedCount++;
+                    return `<span style="color: #5c8374; margin: 0 3px;">${origWord}</span>`;
+                } else {
+                    unmatchedWords.push(origWord);
+                    // Highlight the wrong or missing words in bright red with a soft background
+                    return `<span style="color: #d63031; background-color: #ff767522; padding: 2px 6px; border-radius: 6px; margin: 0 3px; font-weight: bold; border: 2px dashed #ff7675;">${origWord}</span>`;
+                }
+            }).join('');
+
+            const matchRatio = matchedCount / expectedWords.length;
+
+            // If set to strict 100% match (or adjust to 0.70 if you prefer partial match)
+            if (matchRatio >= 1.0) {
+                organicCorrectCount++;
+                completedSentencesCount++;
+                totalSweets += 3; 
+                saveSweetData();
+                updateScoreboard();
+
+                document.getElementById('sentence-display').innerHTML = `<div style="font-size: 24px; line-height: 1.5;">${renderedWordsHtml}</div>`;
+                document.getElementById('feedback').innerText = `🎉 太棒了！全部唸對，獲得 3 顆糖果！`;
+                speakEnglishSentence("Wonderful reading!");
+
+                dropCandiesDirectly(3);
+            } else {
+                wrongCount++;
+                wrongWordsThisSession.push(expectedPageText);
+                updateScoreboard();
+
+                // Display the page with wrong/missed words highlighted in red
+                document.getElementById('sentence-display').innerHTML = `<div style="font-size: 24px; line-height: 1.5;">${renderedWordsHtml}</div>`;
+                document.getElementById('feedback').innerText = `❌ 紅色標記的字讀錯或漏掉了，請再聽一次示範！`;
+                
+                speakEnglishSentence(expectedPageText);
+            }
+        }
+
+
+
         function isBlindMode() {
             const config = CANDY_CONFIG.levelConfig[currentLevel];
             return config ? config.blindMode : false;
         }
 
         window.onload = function() {
+            initLevelDropdown(); // Populate dropdown from config first
             initPhysicsJar();
             loadSweetData();
-            loadLevel(1, false);
+            loadLevel(CANDY_CONFIG.activeLevels[0] || 1, false);
         };
+
+        function initLevelDropdown() {
+            const selectElem = document.getElementById('level-select');
+            selectElem.innerHTML = '';
+            
+            CANDY_CONFIG.activeLevels.forEach(lvl => {
+                const config = CANDY_CONFIG.levelConfig[lvl];
+                if (config) {
+                    const option = document.createElement('option');
+                    option.value = lvl;
+                    option.innerText = config.name || `Level ${lvl}`;
+                    selectElem.appendChild(option);
+                }
+            });
+        }
 
         function loadSweetData() {
             totalSweets = parseInt(localStorage.getItem('kid_total_sweets') || '0');
@@ -596,7 +723,6 @@
             loadLevel(selected, true);
         }
 
-        // Check daily play limits based on config instead of just a binary completed check
         function getLevelPlayCountToday(lvl) {
             const todayStr = new Date().toISOString().split('T')[0]; 
             const history = JSON.parse(localStorage.getItem('study_completion_history') || '[]');
@@ -610,7 +736,7 @@
             return getLevelPlayCountToday(lvl) >= config.maxDailyPlays;
         }
 
-function loadLevel(lvl, isManual) {
+        function loadLevel(lvl, isManual) {
             const config = CANDY_CONFIG.levelConfig[lvl];
             if (!config) return;
 
@@ -627,12 +753,15 @@ function loadLevel(lvl, isManual) {
             } else if (lvl === 2 && typeof passagesLevel2 !== 'undefined') {
                 currentPassages = passagesLevel2;
             } else if (lvl === 3 && typeof passagesLevel3 !== 'undefined') {
-                currentPassages = passagesLevel3; // Or your level 3 passages variable
+                currentPassages = passagesLevel3;
+            } else if (lvl === 4 && typeof passagesLevel4 !== 'undefined') {
+                currentPassages = passagesLevel4; 
+            } else if (lvl === 5 && typeof passagesLevel5 !== 'undefined') {
+                currentPassages = passagesLevel5; 
             } else {
-                currentPassages = ["載入失敗 - 請檢查 passages"];
+                currentPassages = ["Loading Failed"];
             }
 
-            // Automatically pick candy group from config mapping
             currentCandyGroup = CANDY_CONFIG.candyGroups[config.group];
 
             organicCorrectCount = 0;
@@ -649,20 +778,19 @@ function loadLevel(lvl, isManual) {
             loadSentence();
         }
 
-        function loadSentence() {
+function loadSentence() {
             if (currentSentenceIndex >= currentPassages.length) {
                 gameActive = false;
                 let accuracy = totalWordsAttempted > 0 ? (organicCorrectCount / totalWordsAttempted) : 0;
                 let rewardMsg = "";
 
-                if (accuracy >= 0.90 && totalWordsAttempted > 0) {
-                    coins += 5;
-                    rewardMsg = " 🌟 準確率超過 90%，獲得 5 枚金幣！🪙";
+                if (accuracy >= 1 && totalWordsAttempted > 0) {
+                    rewardMsg = " 🌟 準確率超過 100%！";
                     saveCompletionRecord(currentLevel, currentPassages, wrongWordsThisSession);
                 }
 
                 document.getElementById('feedback').innerText = `🏆 Level ${currentLevel} 通關！` + rewardMsg;
-                speakWord("太棒了！通關！");
+                speakWord("Great job!");
                 document.getElementById('sentence-display').innerHTML = '';
                 document.getElementById('target-slots').innerHTML = '';
                 document.getElementById('grid-container').innerHTML = '';
@@ -673,15 +801,52 @@ function loadLevel(lvl, isManual) {
             gameActive = true;
             playerProgressIndex = 0;
             hintUsedForThisWord = false;
+            sentenceHasHinted = false;
 
-            const sentenceStr = currentPassages[currentSentenceIndex];
-            targetChars = sentenceStr.split('');
+            const targetText = currentPassages[currentSentenceIndex];
+
+            // Level 5 Book Reading Mode (Page by Page)
+            if (currentLevel === 5) {
+                const pageNum = currentSentenceIndex + 1;
+                document.getElementById('sentence-display').innerHTML = `<span style="color: #e65100; font-size: 26px; line-height: 1.4;">📖 Page ${pageNum}:<br>"${targetText}"</span>`;
+                document.getElementById('target-slots').innerHTML = '';
+                document.getElementById('grid-container').innerHTML = `
+                    <button id="record-btn" 
+                        onmousedown="startRecordingPage('${targetText.replace(/'/g, "\\'")}')" 
+                        onmouseup="stopRecordingPage()" 
+                        ontouchstart="startRecordingPage('${targetText.replace(/'/g, "\\'")}')" 
+                        ontouchend="stopRecordingPage()" 
+                        style="background-color: #a0c4ff; color: #333; font-size: 20px; padding: 15px 25px; border-radius: 30px; box-shadow: 0 4px #70a9ff; cursor: pointer; user-select: none;">
+                        🎙️ Page ${pageNum} (PRESS TO SPEAK)
+                    </button>
+                `;
+                //document.getElementById('feedback').innerText = `🎙️ Turn to Page ${pageNum}，press and hold the button and read aloud！`;
+                
+                // Speak out the page instruction and the book sentences so the kid knows what to turn to and read
+                speakEnglishSentence(`Turn to page ${pageNum}. ${targetText}`); 
+                return;
+            }
+
+            // Normal Character Ordering Mode for Levels 1-4
+            targetChars = targetText.split('');
             shuffledChars = [...targetChars].sort(() => Math.random() - 0.5);
 
             buildSentenceDisplay(targetChars);
             buildSlots();
             buildGrid();
             playSentenceWithHighlight();
+        }
+
+
+
+        function speakEnglishSentence(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.8;
+                window.speechSynthesis.speak(utterance);
+            }
         }
 
         function buildSentenceDisplay(chars) {
@@ -740,16 +905,14 @@ function loadLevel(lvl, isManual) {
 
                     window.speechSynthesis.speak(utterance);
                 }
-            } catch(e) {
-                console.log("Speech synthesis bypassed");
-            }
+            } catch(e) {}
         }
 
         function repeatSentence() {
             playSentenceWithHighlight();
         }
 
-function saveCompletionRecord(lvl, passages, wrongList) {
+        function saveCompletionRecord(lvl, passages, wrongList) {
             const todayStr = new Date().toISOString().split('T')[0];
             const passageTitle = passages[0].substring(0, 4) + '...'; 
             let history = JSON.parse(localStorage.getItem('study_completion_history') || '[]');
@@ -858,15 +1021,17 @@ function saveCompletionRecord(lvl, passages, wrongList) {
                 hintUsedForThisWord = false; 
                 document.getElementById('feedback').innerText = '👍 對啦！繼續拖拽下一個字！';
 
-                if (playerProgressIndex >= targetChars.length) {
+                if (playerProgressIndex >= targetChars.length) {    
                     document.getElementById('feedback').innerText = '🎉 太棒了！這句完成！';
                     
                     completedSentencesCount++;
-                    totalSweets += 3; 
+                    const candiesEarned = sentenceHasHinted ? 1 : 3;
+                    totalSweets += candiesEarned; 
+                    
                     saveSweetData();
                     updateScoreboard();
 
-                    dropCandiesDirectly(3);
+                    dropCandiesDirectly(candiesEarned);
                 }
             } else {
                 wrongCount++;
@@ -914,6 +1079,7 @@ function saveCompletionRecord(lvl, passages, wrongList) {
         function requestHint() {
             if (!gameActive) return;
             hintUsedForThisWord = true; 
+            sentenceHasHinted = true;
             const expectedChar = targetChars[playerProgressIndex];
             wrongWordsThisSession.push(expectedChar); 
 
@@ -938,7 +1104,6 @@ function saveCompletionRecord(lvl, passages, wrongList) {
         function updateScoreboard() {
             document.getElementById('stat-correct').innerText = organicCorrectCount;
             document.getElementById('stat-wrong').innerText = wrongCount;
-            document.getElementById('stat-coins').innerText = coins;
             document.getElementById('stat-sweets').innerText = totalSweets;
             document.getElementById('stat-sentences').innerText = completedSentencesCount;
         }
