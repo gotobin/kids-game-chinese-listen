@@ -14,6 +14,15 @@
     <script src="physics_config.js"></script>
 
     <style>
+
+    #record-btn {
+    -webkit-touch-callout: none; /* Prevents iOS/Android context menu popup */
+    -webkit-user-select: none;   /* Prevents text selection */
+    user-select: none;
+    touch-action: manipulation;  /* Optimizes touch response and stops long-press triggers */
+    }
+
+
         body {
             font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
             background-color: #f0f7f4;
@@ -812,20 +821,18 @@ function loadSentence() {
                 document.getElementById('target-slots').innerHTML = '';
                 document.getElementById('grid-container').innerHTML = `
                     <button id="record-btn" 
-                        onmousedown="startRecordingPage('${targetText.replace(/'/g, "\\'")}')" 
-                        onmouseup="stopRecordingPage()" 
-                        ontouchstart="startRecordingPage('${targetText.replace(/'/g, "\\'")}')" 
-                        ontouchend="stopRecordingPage()" 
-                        style="background-color: #a0c4ff; color: #333; font-size: 20px; padding: 15px 25px; border-radius: 30px; box-shadow: 0 4px #70a9ff; cursor: pointer; user-select: none;">
+                        onpointerdown="startRecordingPage('${targetText.replace(/'/g, "\\'")}')" 
+                        onpointerup="stopRecordingPage()" 
+                        style="background-color: #a0c4ff; color: #333; font-size: 20px; padding: 15px 25px; border-radius: 30px; box-shadow: 0 4px #70a9ff; cursor: pointer; -webkit-touch-callout: none; user-select: none; touch-action: manipulation;">
                         🎙️ Page ${pageNum} (PRESS TO SPEAK)
                     </button>
                 `;
-                //document.getElementById('feedback').innerText = `🎙️ Turn to Page ${pageNum}，press and hold the button and read aloud！`;
+                document.getElementById('feedback').innerText = `🎙️ Turn to Page ${pageNum}，press and hold the button and read aloud！`;
                 
-                // Speak out the page instruction and the book sentences so the kid knows what to turn to and read
                 speakEnglishSentence(`Turn to page ${pageNum}. ${targetText}`); 
                 return;
             }
+
 
             // Normal Character Ordering Mode for Levels 1-4
             targetChars = targetText.split('');
